@@ -44,62 +44,30 @@ jobs:
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             ./ ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }}:/home/deployer/smart-coded-strapi-fyonka/
 
-      - name: Install Dependencies and Setup PM2
+      - name: Deploy Application
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
-            cd /home/deployer/smart-coded-strapi-fyonka
-            
-            # Source NVM
-            export NVM_DIR="$HOME/.nvm"
+            # Source NVM to get Node.js and PM2
+            export NVM_DIR="/root/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             
-            echo "Current user: $(whoami)"
-            echo "Node.js version: $(node --version)"
-            echo "NPM version: $(npm --version)"
-            echo "Current PATH: $PATH"
+            # Set the correct PATH to include NVM binaries
+            export PATH="/root/.nvm/versions/node/v18.20.8/bin:$PATH"
+            
+            echo "Environment check:"
+            echo "Node: $(node --version)"
+            echo "NPM: $(npm --version)"
+            echo "PM2: $(pm2 --version)"
+            echo "PM2 location: $(which pm2)"
+            
+            cd /home/deployer/smart-coded-strapi-fyonka
             
             # Install production dependencies
             export NODE_ENV=production
-            rm -rf node_modules package-lock.json
             npm install --production --no-audit --no-fund
             
-            # Install PM2 globally and verify
-            echo "Installing PM2..."
-            npm install -g pm2
-            
-            # Update PATH to include global npm modules
-            export PATH="$(npm bin -g):$PATH"
-            
-            echo "PM2 installation check:"
-            which pm2 || echo "PM2 not found in PATH"
-            npm list -g pm2 || echo "PM2 not in global packages"
-            
-            # Create a simple start script as fallback
-            cat > start-strapi.sh <<'STARTSCRIPT'
-          #!/bin/bash
-          export NVM_DIR="$HOME/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-          export NODE_ENV=production
-          cd /home/deployer/smart-coded-strapi-fyonka
-          node_modules/.bin/strapi start
-          STARTSCRIPT
-            chmod +x start-strapi.sh
-            
-            echo "Setup completed"
-          EOF
-
-      - name: Start Application with PM2
-        run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
-            cd /home/deployer/smart-coded-strapi-fyonka
-            
-            # Source NVM and set PATH
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            export PATH="$(npm bin -g):$PATH"
-            
             # Create ecosystem config
-            cat > ecosystem.config.js <<'EOLCONFIG'
+            cat > ecosystem.config.js <<'PMCONFIG'
           module.exports = {
             apps: [{
               name: 'strapi-app',
@@ -115,66 +83,60 @@ jobs:
               exec_mode: 'fork',
               watch: false,
               max_memory_restart: '1G',
-              min_uptime: '10s',
-              max_restarts: 5
+              error_file: './logs/err.log',
+              out_file: './logs/out.log',
+              log_file: './logs/combined.log',
+              time: true
             }]
           };
-          EOLCONFIG
+          PMCONFIG
             
             # Create logs directory
             mkdir -p logs
             chown -R deployer:deployer /home/deployer/smart-coded-strapi-fyonka || true
             
-            # Try to use PM2, fallback to direct execution
-            if command -v pm2 &> /dev/null; then
-              echo "Using PM2 to start application..."
-              pm2 kill || true
-              pm2 start ecosystem.config.js
-              pm2 save
-              pm2 list
-            else
-              echo "PM2 not available, starting with nohup..."
-              # Kill any existing process
-              pkill -f "strapi start" || true
-              sleep 2
-              # Start with nohup
-              nohup ./start-strapi.sh > logs/strapi.log 2>&1 &
-              echo $! > strapi.pid
-              sleep 5
-              echo "Application started with PID: $(cat strapi.pid)"
-            fi
+            # Stop and delete existing app
+            pm2 stop strapi-app 2>/dev/null || true
+            pm2 delete strapi-app 2>/dev/null || true
             
-            echo "Deployment completed"
+            # Start the application
+            pm2 start ecosystem.config.js
+            pm2 save
+            pm2 list
+            
+            echo "✅ Deployment completed successfully!"
           EOF
 
       - name: Health Check
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
-            cd /home/deployer/smart-coded-strapi-fyonka
+            # Source NVM and set PATH
+            export NVM_DIR="/root/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            export PATH="/root/.nvm/versions/node/v18.20.8/bin:$PATH"
             
-            # Wait for application to start
+            # Wait for startup
             sleep 15
             
-            # Check if application is running
-            if ss -tlnp | grep -q ":1337" || netstat -tlnp 2>/dev/null | grep -q ":1337"; then
+            # Check PM2 status
+            echo "PM2 Status:"
+            pm2 list
+            pm2 show strapi-app
+            
+            # Check if port 1337 is listening
+            if ss -tlnp | grep -q ":1337"; then
               echo "✅ Application is listening on port 1337"
               
-              # Test the application endpoint
-              if curl -f http://localhost:1337/admin > /dev/null 2>&1; then
-                echo "✅ Application is responding to requests"
+              # Test HTTP response
+              if curl -f http://localhost:1337/admin &>/dev/null; then
+                echo "✅ Application is responding to HTTP requests"
               else
-                echo "⚠️ Application is running but may still be starting up"
+                echo "⚠️ Application is running but admin interface may still be loading"
               fi
             else
-              echo "❌ Application is not listening on port 1337"
-              echo "Checking logs..."
-              if [ -f logs/strapi.log ]; then
-                tail -30 logs/strapi.log
-              fi
-              if [ -f strapi.pid ]; then
-                echo "Process ID: $(cat strapi.pid)"
-                ps aux | grep $(cat strapi.pid) || echo "Process not running"
-              fi
+              echo "❌ Application not listening on port 1337"
+              echo "PM2 logs:"
+              pm2 logs strapi-app --lines 30
               exit 1
             fi
           EOF
