@@ -49,18 +49,34 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
             cd /home/deployer/smart-coded-strapi-fyonka
             
+            # Source NVM and make Node.js available
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            
+            # Add Node.js and npm to PATH
+            export PATH="$NVM_DIR/versions/node/v18.20.8/bin:$PATH"
             
             echo "Node.js version: $(node --version)"
             echo "NPM version: $(npm --version)"
             
+            # Install PM2 globally if not present
+            if ! command -v pm2 &> /dev/null; then
+              echo "Installing PM2 globally..."
+              npm install -g pm2
+            fi
+            
+            # Verify PM2 is available
+            echo "PM2 version: $(pm2 --version)"
+            echo "PM2 location: $(which pm2)"
+            
             export NODE_ENV=production
             
+            # Clean install production dependencies
+            rm -rf node_modules package-lock.json
             npm install --production --no-audit --no-fund
             
-            if [ ! -f "ecosystem.config.js" ]; then
-              cat > ecosystem.config.js <<'EOLCONFIG'
+            # Create ecosystem config
+            cat > ecosystem.config.js <<'EOLCONFIG'
           module.exports = {
             apps: [{
               name: 'strapi-app',
@@ -85,21 +101,25 @@ jobs:
             }]
           };
           EOLCONFIG
-            fi
             
+            # Create logs directory
             mkdir -p logs
+            
+            # Set proper permissions
             chown -R deployer:deployer /home/deployer/smart-coded-strapi-fyonka || true
             
-            if ! command -v pm2 &> /dev/null; then
-              echo "Installing PM2..."
-              npm install -g pm2
-            fi
+            # Stop existing PM2 processes
+            pm2 kill || true
             
-            pm2 stop strapi-app || true
-            pm2 delete strapi-app || true
+            # Start the application
             pm2 start ecosystem.config.js
+            
+            # Save PM2 configuration
             pm2 save
+            
+            # Show PM2 status
             pm2 list
+            pm2 show strapi-app
             
             echo "Deployment completed successfully!"
           EOF
@@ -107,23 +127,35 @@ jobs:
       - name: Health Check
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
-            sleep 15
+            # Source NVM and set PATH
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            export PATH="$NVM_DIR/versions/node/v18.20.8/bin:$PATH"
             
-            if pm2 list | grep -q "strapi-app.*online"; then
-              echo "Application is running in PM2"
+            # Wait for application to start
+            sleep 20
+            
+            # Check PM2 status
+            if pm2 list | grep -q "strapi-app"; then
+              echo "Application is registered in PM2"
+              pm2 show strapi-app
             else
-              echo "Application failed to start"
-              pm2 logs strapi-app --lines 20
+              echo "Application not found in PM2"
+              pm2 list
               exit 1
             fi
             
-            if netstat -tlnp | grep -q ":1337"; then
+            # Check if port 1337 is listening
+            if ss -tlnp | grep -q ":1337" || netstat -tlnp 2>/dev/null | grep -q ":1337"; then
               echo "Application is listening on port 1337"
             else
               echo "Application is not listening on port 1337"
-              pm2 logs strapi-app --lines 20
+              echo "Checking PM2 logs:"
+              pm2 logs strapi-app --lines 30
               exit 1
             fi
+            
+            echo "Health check passed!"
           EOF
 
       - name: Reload Nginx
