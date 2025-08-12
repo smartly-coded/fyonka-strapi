@@ -1,0 +1,30 @@
+{
+  "kind": "singleType",
+  "collectionName": "bottom_bars",
+  "info": {
+    "singularName": "bottom-bar",
+    "pluralName": "bottom-bars",
+    "displayName": "BottomBar"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "phonenumber": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "location": {
+      "type": "string"
+    },
+    "googlePlaylink": {
+      "type": "string"
+    },
+    "appStoreLink": {
+      "type": "string"
+    }
+  }
+}

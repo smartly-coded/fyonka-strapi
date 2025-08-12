@@ -1,0 +1,36 @@
+{
+  "kind": "singleType",
+  "collectionName": "home_leistungens",
+  "info": {
+    "singularName": "home-leistungen",
+    "pluralName": "home-leistungens",
+    "displayName": "HomeLeistungen"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "topimage": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "subtitle": {
+      "type": "string"
+    },
+    "services": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::leistungen.leistungen"
+    }
+  }
+}
