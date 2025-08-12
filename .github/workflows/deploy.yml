@@ -7,21 +7,39 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: deployer
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      # Only installs dependencies locally if needed for build (optional)
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Admin Panel
+        run: npm run build
 
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.DO_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.DO_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H "${{ secrets.DO_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Upload Project to Server
         run: |
           rsync -avz --delete \
+            --exclude="node_modules" \
+            --exclude=".cache" \
+            --exclude=".env" \
+            --exclude="build" \
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             ./ ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }}:/home/deployer/smart-coded-strapi-fyonka/
 
@@ -36,7 +54,7 @@ jobs:
               pm2 restart ecosystem.config.js || pm2 start ecosystem.config.js
             EOF
 
-      - name: Reload Nginx (Optional)
+      - name: Reload Nginx (optional)
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} \
