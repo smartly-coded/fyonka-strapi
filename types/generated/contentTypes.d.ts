@@ -486,11 +486,24 @@ export interface ApiBottomBarBottomBar extends Struct.SingleTypeSchema {
   };
   attributes: {
     appStoreLink: Schema.Attribute.String;
+    appStorePhoto: Schema.Attribute.Media<
+      'images' | 'files' | 'videos' | 'audios'
+    >;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     email: Schema.Attribute.String;
+    emailIcon: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
+    fyonkaLogo: Schema.Attribute.Media<
+      'images' | 'files' | 'videos' | 'audios'
+    >;
+    googlePlayIcon: Schema.Attribute.Media<
+      'images' | 'files' | 'videos' | 'audios'
+    >;
     googlePlaylink: Schema.Attribute.String;
+    kontaktIcon: Schema.Attribute.Media<
+      'images' | 'files' | 'videos' | 'audios'
+    >;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -498,6 +511,10 @@ export interface ApiBottomBarBottomBar extends Struct.SingleTypeSchema {
     > &
       Schema.Attribute.Private;
     location: Schema.Attribute.String;
+    locationIcon: Schema.Attribute.Media<
+      'images' | 'files' | 'videos' | 'audios'
+    >;
+    map: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
     phonenumber: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
     updatedAt: Schema.Attribute.DateTime;
