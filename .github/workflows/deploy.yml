@@ -49,15 +49,40 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
             cd /home/deployer/smart-coded-strapi-fyonka
             
-            # Set direct paths to Node.js and PM2
+            # Set direct paths
             export NODE_PATH="/root/.nvm/versions/node/v18.20.8/bin/node"
             export NPM_PATH="/root/.nvm/versions/node/v18.20.8/bin/npm"
             export PM2_PATH="/root/.nvm/versions/node/v18.20.8/bin/pm2"
+            export PM2_DIRECT="/root/.nvm/versions/node/v18.20.8/lib/node_modules/pm2/bin/pm2"
+            
+            # Fix permissions
+            chmod +x "$PM2_PATH" 2>/dev/null || true
+            chmod +x "$PM2_DIRECT" 2>/dev/null || true
+            chmod +x /root/.nvm/versions/node/v18.20.8/bin/* 2>/dev/null || true
             
             echo "Environment check:"
             echo "Node: $($NODE_PATH --version)"
             echo "NPM: $($NPM_PATH --version)"
-            echo "PM2: $($PM2_PATH --version)"
+            
+            # Try PM2, fallback to direct execution
+            if [ -x "$PM2_PATH" ]; then
+              echo "PM2 via symlink: $($PM2_PATH --version)"
+              PM2_CMD="$PM2_PATH"
+            elif [ -x "$PM2_DIRECT" ]; then
+              echo "PM2 via direct path: $($NODE_PATH $PM2_DIRECT --version)"
+              PM2_CMD="$NODE_PATH $PM2_DIRECT"
+            else
+              echo "❌ PM2 not executable, trying alternative approach"
+              # Try using /usr/local/bin/pm2 symlink
+              if [ -L /usr/local/bin/pm2 ]; then
+                chmod +x /usr/local/bin/pm2 2>/dev/null || true
+                PM2_CMD="/usr/local/bin/pm2"
+                echo "Using system PM2: $(/usr/local/bin/pm2 --version)"
+              else
+                echo "❌ No working PM2 found"
+                exit 1
+              fi
+            fi
             
             # Install production dependencies
             export NODE_ENV=production
@@ -93,13 +118,13 @@ jobs:
             chown -R deployer:deployer /home/deployer/smart-coded-strapi-fyonka || true
             
             # Stop and delete existing app
-            $PM2_PATH stop strapi-app 2>/dev/null || true
-            $PM2_PATH delete strapi-app 2>/dev/null || true
+            $PM2_CMD stop strapi-app 2>/dev/null || true
+            $PM2_CMD delete strapi-app 2>/dev/null || true
             
             # Start the application
-            $PM2_PATH start ecosystem.config.js
-            $PM2_PATH save
-            $PM2_PATH list
+            $PM2_CMD start ecosystem.config.js
+            $PM2_CMD save
+            $PM2_CMD list
             
             echo "✅ Deployment completed successfully!"
           EOF
@@ -107,46 +132,33 @@ jobs:
       - name: Health Check
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
-            # Set direct path to PM2
-            export PM2_PATH="/root/.nvm/versions/node/v18.20.8/bin/pm2"
+            # Find working PM2 command
+            if [ -x "/root/.nvm/versions/node/v18.20.8/bin/pm2" ]; then
+              PM2_CMD="/root/.nvm/versions/node/v18.20.8/bin/pm2"
+            elif [ -x "/usr/local/bin/pm2" ]; then
+              PM2_CMD="/usr/local/bin/pm2"
+            elif [ -x "/root/.nvm/versions/node/v18.20.8/lib/node_modules/pm2/bin/pm2" ]; then
+              PM2_CMD="/root/.nvm/versions/node/v18.20.8/bin/node /root/.nvm/versions/node/v18.20.8/lib/node_modules/pm2/bin/pm2"
+            else
+              echo "❌ No working PM2 found for health check"
+              exit 1
+            fi
             
             # Wait for startup
             sleep 15
             
             # Check PM2 status
             echo "PM2 Status:"
-            $PM2_PATH list
-            $PM2_PATH show strapi-app
+            $PM2_CMD list
+            $PM2_CMD show strapi-app
             
             # Check if port 1337 is listening
             if ss -tlnp | grep -q ":1337"; then
               echo "✅ Application is listening on port 1337"
-              
-              # Test HTTP response
-              if curl -f http://localhost:1337/admin &>/dev/null; then
-                echo "✅ Application is responding to HTTP requests"
-              else
-                echo "⚠️ Application is running but admin interface may still be loading"
-              fi
             else
               echo "❌ Application not listening on port 1337"
               echo "PM2 logs:"
-              $PM2_PATH logs strapi-app --lines 30
+              $PM2_CMD logs strapi-app --lines 30
               exit 1
-            fi
-          EOF
-
-      - name: Reload Nginx
-        run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
-            if command -v nginx &> /dev/null; then
-              if sudo nginx -t; then
-                sudo systemctl reload nginx
-                echo "✅ Nginx reloaded successfully"
-              else
-                echo "❌ Nginx configuration test failed"
-              fi
-            else
-              echo "ℹ️ Nginx not installed, skipping reload"
             fi
           EOF
