@@ -47,10 +47,29 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
             cd /home/deployer/smart-coded-strapi-fyonka
+            
+            # Check Node.js version
+            node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
+            if [ "$node_version" -lt 18 ]; then
+              echo "❌ Node.js version $node_version is not supported. Strapi 5.x requires Node.js ≥18"
+              exit 1
+            fi
+            
+            # Set environment variables
             export NODE_ENV=production
-            npm install --production
+            
+            # Clean install dependencies
+            rm -rf node_modules package-lock.json
+            npm install --production --no-audit
+            
+            # Build the application
             npm run build
+            
+            # Restart PM2
             pm2 restart ecosystem.config.js || pm2 start ecosystem.config.js
+            
+            # Save PM2 configuration
+            pm2 save
           EOF
 
       - name: Reload Nginx (optional)
