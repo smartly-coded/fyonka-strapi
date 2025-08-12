@@ -22,3 +22,22 @@ jobs:
       - name: Upload Project to Server
         run: |
           rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            ./ ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }}:/home/deployer/smart-coded-strapi-fyonka/
+
+      - name: Install & Restart on Server
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} << 'EOF'
+              cd /home/deployer/smart-coded-strapi-fyonka
+              export NODE_ENV=production
+              npm install --production
+              npm run build
+              pm2 restart ecosystem.config.js || pm2 start ecosystem.config.js
+            EOF
+
+      - name: Reload Nginx (Optional)
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} \
+            "sudo nginx -t && sudo systemctl reload nginx"
