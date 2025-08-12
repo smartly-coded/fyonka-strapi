@@ -47,24 +47,21 @@ jobs:
       - name: Deploy Application
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
-            # Source NVM to get Node.js and PM2
-            export NVM_DIR="/root/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            cd /home/deployer/smart-coded-strapi-fyonka
             
-            # Set the correct PATH to include NVM binaries
-            export PATH="/root/.nvm/versions/node/v18.20.8/bin:$PATH"
+            # Set direct paths to Node.js and PM2
+            export NODE_PATH="/root/.nvm/versions/node/v18.20.8/bin/node"
+            export NPM_PATH="/root/.nvm/versions/node/v18.20.8/bin/npm"
+            export PM2_PATH="/root/.nvm/versions/node/v18.20.8/bin/pm2"
             
             echo "Environment check:"
-            echo "Node: $(node --version)"
-            echo "NPM: $(npm --version)"
-            echo "PM2: $(pm2 --version)"
-            echo "PM2 location: $(which pm2)"
-            
-            cd /home/deployer/smart-coded-strapi-fyonka
+            echo "Node: $($NODE_PATH --version)"
+            echo "NPM: $($NPM_PATH --version)"
+            echo "PM2: $($PM2_PATH --version)"
             
             # Install production dependencies
             export NODE_ENV=production
-            npm install --production --no-audit --no-fund
+            $NPM_PATH install --production --no-audit --no-fund
             
             # Create ecosystem config
             cat > ecosystem.config.js <<'PMCONFIG'
@@ -96,13 +93,13 @@ jobs:
             chown -R deployer:deployer /home/deployer/smart-coded-strapi-fyonka || true
             
             # Stop and delete existing app
-            pm2 stop strapi-app 2>/dev/null || true
-            pm2 delete strapi-app 2>/dev/null || true
+            $PM2_PATH stop strapi-app 2>/dev/null || true
+            $PM2_PATH delete strapi-app 2>/dev/null || true
             
             # Start the application
-            pm2 start ecosystem.config.js
-            pm2 save
-            pm2 list
+            $PM2_PATH start ecosystem.config.js
+            $PM2_PATH save
+            $PM2_PATH list
             
             echo "✅ Deployment completed successfully!"
           EOF
@@ -110,18 +107,16 @@ jobs:
       - name: Health Check
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
-            # Source NVM and set PATH
-            export NVM_DIR="/root/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            export PATH="/root/.nvm/versions/node/v18.20.8/bin:$PATH"
+            # Set direct path to PM2
+            export PM2_PATH="/root/.nvm/versions/node/v18.20.8/bin/pm2"
             
             # Wait for startup
             sleep 15
             
             # Check PM2 status
             echo "PM2 Status:"
-            pm2 list
-            pm2 show strapi-app
+            $PM2_PATH list
+            $PM2_PATH show strapi-app
             
             # Check if port 1337 is listening
             if ss -tlnp | grep -q ":1337"; then
@@ -136,7 +131,7 @@ jobs:
             else
               echo "❌ Application not listening on port 1337"
               echo "PM2 logs:"
-              pm2 logs strapi-app --lines 30
+              $PM2_PATH logs strapi-app --lines 30
               exit 1
             fi
           EOF
