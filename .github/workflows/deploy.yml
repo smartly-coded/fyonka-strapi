@@ -49,22 +49,51 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
             cd /home/deployer/smart-coded-strapi-fyonka
             
-            # Use the working NVM paths directly
+            # Fix permissions every time (workaround for the permission issue)
+            chmod -R +x /root/.nvm/versions/node/v18.20.8/bin/ 2>/dev/null || true
+            chmod +x /root/.nvm/versions/node/v18.20.8/lib/node_modules/pm2/bin/pm2 2>/dev/null || true
+            
+            # Use variables for paths
             NODE_BIN="/root/.nvm/versions/node/v18.20.8/bin/node"
             NPM_BIN="/root/.nvm/versions/node/v18.20.8/bin/npm"
-            PM2_BIN="/root/.nvm/versions/node/v18.20.8/bin/pm2"
             
             echo "Environment check:"
-            echo "Node: $($NODE_BIN --version)"
-            echo "NPM: $($NPM_BIN --version)"
-            echo "PM2: $($PM2_BIN --version)"
+            echo "Node: $($NODE_BIN --version 2>/dev/null || echo 'Node failed')"
+            echo "NPM: $($NPM_BIN --version 2>/dev/null || echo 'NPM failed')"
             
             # Install production dependencies
             export NODE_ENV=production
             $NPM_BIN install --production --no-audit --no-fund
             
-            # Create ecosystem config
-            cat > ecosystem.config.js <<'PMCONFIG'
+            # Create a simple startup script
+            cat > start-strapi.sh <<'STARTSCRIPT'
+          #!/bin/bash
+          cd /home/deployer/smart-coded-strapi-fyonka
+          export NODE_ENV=production
+          export PORT=1337
+          export HOST=0.0.0.0
+          
+          # Kill any existing Strapi processes
+          pkill -f "strapi start" || true
+          pkill -f "node.*strapi" || true
+          
+          # Start Strapi in background
+          nohup /root/.nvm/versions/node/v18.20.8/bin/node node_modules/.bin/strapi start > logs/strapi.log 2>&1 &
+          echo $! > strapi.pid
+          
+          echo "Strapi started with PID: $(cat strapi.pid)"
+          STARTSCRIPT
+            
+            chmod +x start-strapi.sh
+            mkdir -p logs
+            chown -R deployer:deployer /home/deployer/smart-coded-strapi-fyonka || true
+            
+            # Try PM2 first, fallback to direct execution
+            if /root/.nvm/versions/node/v18.20.8/bin/pm2 --version &>/dev/null; then
+              echo "Using PM2..."
+              
+              # Create ecosystem config
+              cat > ecosystem.config.js <<'PMCONFIG'
           module.exports = {
             apps: [{
               name: 'strapi-app',
@@ -87,35 +116,41 @@ jobs:
             }]
           };
           PMCONFIG
+              
+              /root/.nvm/versions/node/v18.20.8/bin/pm2 stop strapi-app 2>/dev/null || true
+              /root/.nvm/versions/node/v18.20.8/bin/pm2 delete strapi-app 2>/dev/null || true
+              /root/.nvm/versions/node/v18.20.8/bin/pm2 start ecosystem.config.js
+              /root/.nvm/versions/node/v18.20.8/bin/pm2 save
+              /root/.nvm/versions/node/v18.20.8/bin/pm2 list
+            else
+              echo "PM2 failed, using direct startup script..."
+              ./start-strapi.sh
+              sleep 3
+              if [ -f strapi.pid ]; then
+                echo "Strapi PID: $(cat strapi.pid)"
+                ps aux | grep $(cat strapi.pid) | grep -v grep || echo "Process not found"
+              fi
+            fi
             
-            # Create logs directory
-            mkdir -p logs
-            chown -R deployer:deployer /home/deployer/smart-coded-strapi-fyonka || true
-            
-            # Stop and delete existing app
-            $PM2_BIN stop strapi-app 2>/dev/null || true
-            $PM2_BIN delete strapi-app 2>/dev/null || true
-            
-            # Start the application
-            $PM2_BIN start ecosystem.config.js
-            $PM2_BIN save
-            $PM2_BIN list
-            
-            echo "✅ Deployment completed successfully!"
+            echo "✅ Deployment completed!"
           EOF
 
       - name: Health Check
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
-            PM2_BIN="/root/.nvm/versions/node/v18.20.8/bin/pm2"
+            cd /home/deployer/smart-coded-strapi-fyonka
             
             # Wait for startup
-            sleep 15
+            sleep 20
             
-            # Check PM2 status
-            echo "PM2 Status:"
-            $PM2_BIN list
-            $PM2_BIN show strapi-app
+            # Check if using PM2 or direct process
+            if /root/.nvm/versions/node/v18.20.8/bin/pm2 list &>/dev/null; then
+              echo "PM2 Status:"
+              /root/.nvm/versions/node/v18.20.8/bin/pm2 list
+            elif [ -f strapi.pid ]; then
+              echo "Direct process PID: $(cat strapi.pid)"
+              ps aux | grep $(cat strapi.pid) | grep -v grep || echo "Process not found"
+            fi
             
             # Check if port 1337 is listening
             if ss -tlnp | grep -q ":1337"; then
@@ -129,23 +164,15 @@ jobs:
               fi
             else
               echo "❌ Application not listening on port 1337"
-              echo "PM2 logs:"
-              $PM2_BIN logs strapi-app --lines 30
-              exit 1
-            fi
-          EOF
-
-      - name: Reload Nginx
-        run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
-            if command -v nginx &> /dev/null; then
-              if sudo nginx -t; then
-                sudo systemctl reload nginx
-                echo "✅ Nginx reloaded successfully"
-              else
-                echo "❌ Nginx configuration test failed"
+              echo "Checking logs..."
+              if [ -f logs/strapi.log ]; then
+                echo "=== Strapi logs ==="
+                tail -30 logs/strapi.log
               fi
-            else
-              echo "ℹ️ Nginx not installed, skipping reload"
+              if /root/.nvm/versions/node/v18.20.8/bin/pm2 logs &>/dev/null; then
+                echo "=== PM2 logs ==="
+                /root/.nvm/versions/node/v18.20.8/bin/pm2 logs strapi-app --lines 30
+              fi
+              exit 1
             fi
           EOF
