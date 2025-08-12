@@ -49,34 +49,19 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
             cd /home/deployer/smart-coded-strapi-fyonka
             
-            # Set direct paths
-            export NODE_PATH="/root/.nvm/versions/node/v18.20.8/bin/node"
-            export NPM_PATH="/root/.nvm/versions/node/v18.20.8/bin/npm"
-            
-            # Use the system PM2 symlink which should work
-            export PM2_PATH="/usr/local/bin/pm2"
-            
-            # Fix permissions if needed
-            chmod +x /root/.nvm/versions/node/v18.20.8/bin/pm2 2>/dev/null || true
-            chmod +x /root/.nvm/versions/node/v18.20.8/lib/node_modules/pm2/bin/pm2 2>/dev/null || true
-            chmod +x /usr/local/bin/pm2 2>/dev/null || true
+            # Use the working NVM paths directly
+            NODE_BIN="/root/.nvm/versions/node/v18.20.8/bin/node"
+            NPM_BIN="/root/.nvm/versions/node/v18.20.8/bin/npm"
+            PM2_BIN="/root/.nvm/versions/node/v18.20.8/bin/pm2"
             
             echo "Environment check:"
-            echo "Node: $($NODE_PATH --version)"
-            echo "NPM: $($NPM_PATH --version)"
-            echo "PM2 symlink check: $(ls -la /usr/local/bin/pm2)"
-            echo "PM2: $($PM2_PATH --version 2>/dev/null || echo 'PM2 failed')"
-            
-            # If PM2 still fails, try direct node execution
-            if ! $PM2_PATH --version &>/dev/null; then
-              echo "PM2 symlink failed, trying direct execution..."
-              export PM2_PATH="$NODE_PATH /root/.nvm/versions/node/v18.20.8/lib/node_modules/pm2/bin/pm2"
-              echo "PM2 direct: $($PM2_PATH --version)"
-            fi
+            echo "Node: $($NODE_BIN --version)"
+            echo "NPM: $($NPM_BIN --version)"
+            echo "PM2: $($PM2_BIN --version)"
             
             # Install production dependencies
             export NODE_ENV=production
-            $NPM_PATH install --production --no-audit --no-fund
+            $NPM_BIN install --production --no-audit --no-fund
             
             # Create ecosystem config
             cat > ecosystem.config.js <<'PMCONFIG'
@@ -108,13 +93,13 @@ jobs:
             chown -R deployer:deployer /home/deployer/smart-coded-strapi-fyonka || true
             
             # Stop and delete existing app
-            $PM2_PATH stop strapi-app 2>/dev/null || true
-            $PM2_PATH delete strapi-app 2>/dev/null || true
+            $PM2_BIN stop strapi-app 2>/dev/null || true
+            $PM2_BIN delete strapi-app 2>/dev/null || true
             
             # Start the application
-            $PM2_PATH start ecosystem.config.js
-            $PM2_PATH save
-            $PM2_PATH list
+            $PM2_BIN start ecosystem.config.js
+            $PM2_BIN save
+            $PM2_BIN list
             
             echo "✅ Deployment completed successfully!"
           EOF
@@ -122,20 +107,15 @@ jobs:
       - name: Health Check
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
-            # Try system PM2 first, fallback to direct execution
-            if /usr/local/bin/pm2 --version &>/dev/null; then
-              PM2_CMD="/usr/local/bin/pm2"
-            else
-              PM2_CMD="/root/.nvm/versions/node/v18.20.8/bin/node /root/.nvm/versions/node/v18.20.8/lib/node_modules/pm2/bin/pm2"
-            fi
+            PM2_BIN="/root/.nvm/versions/node/v18.20.8/bin/pm2"
             
             # Wait for startup
             sleep 15
             
             # Check PM2 status
             echo "PM2 Status:"
-            $PM2_CMD list
-            $PM2_CMD show strapi-app
+            $PM2_BIN list
+            $PM2_BIN show strapi-app
             
             # Check if port 1337 is listening
             if ss -tlnp | grep -q ":1337"; then
@@ -150,7 +130,7 @@ jobs:
             else
               echo "❌ Application not listening on port 1337"
               echo "PM2 logs:"
-              $PM2_CMD logs strapi-app --lines 30 2>/dev/null || echo "Could not retrieve logs"
+              $PM2_BIN logs strapi-app --lines 30
               exit 1
             fi
           EOF
