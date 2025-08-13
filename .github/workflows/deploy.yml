@@ -19,7 +19,6 @@ jobs:
           node-version: 18
           cache: 'npm'
 
-      # Only installs dependencies locally if needed for build (optional)
       - name: Install Dependencies
         run: npm ci
 
@@ -39,41 +38,115 @@ jobs:
             --exclude="node_modules" \
             --exclude=".cache" \
             --exclude=".env" \
-            --exclude="build" \
+            --exclude=".git" \
+            --exclude=".github" \
+            --exclude="*.log" \
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             ./ ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }}:/home/deployer/smart-coded-strapi-fyonka/
 
-      - name: Install & Restart on Server
+      - name: Deploy Application
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
             cd /home/deployer/smart-coded-strapi-fyonka
             
-            # Check Node.js version
-            node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
-            if [ "$node_version" -lt 18 ]; then
-              echo "❌ Node.js version $node_version is not supported. Strapi 5.x requires Node.js ≥18"
-              exit 1
-            fi
+            # Use system Node.js instead of NVM
+            export PATH="/usr/bin:/usr/local/bin:/bin:/sbin:/usr/sbin"
             
-            # Set environment variables
+            echo "Environment check:"
+            echo "Node: $(node --version)"
+            echo "NPM: $(npm --version)"
+            echo "PM2: $(pm2 --version)"
+            echo "Node location: $(which node)"
+            echo "PM2 location: $(which pm2)"
+            
+            # Install production dependencies
             export NODE_ENV=production
+            npm install --production --no-audit --no-fund
             
-            # Clean install dependencies
-            rm -rf node_modules package-lock.json
-            npm install --production --no-audit
+            # Create ecosystem config
+            cat > ecosystem.config.js <<'PMCONFIG'
+          module.exports = {
+            apps: [{
+              name: 'strapi-app',
+              script: './node_modules/.bin/strapi',
+              args: 'start',
+              cwd: '/home/deployer/smart-coded-strapi-fyonka',
+              env: {
+                NODE_ENV: 'production',
+                PORT: 1337,
+                HOST: '0.0.0.0'
+              },
+              instances: 1,
+              exec_mode: 'fork',
+              watch: false,
+              max_memory_restart: '1G',
+              error_file: './logs/err.log',
+              out_file: './logs/out.log',
+              log_file: './logs/combined.log',
+              time: true
+            }]
+          };
+          PMCONFIG
             
-            # Build the application
-            npm run build
+            # Create logs directory
+            mkdir -p logs
+            chown -R deployer:deployer /home/deployer/smart-coded-strapi-fyonka || true
             
-            # Restart PM2
-            pm2 restart ecosystem.config.js || pm2 start ecosystem.config.js
+            # Stop and delete existing app
+            pm2 stop strapi-app 2>/dev/null || true
+            pm2 delete strapi-app 2>/dev/null || true
             
-            # Save PM2 configuration
+            # Start the application
+            pm2 start ecosystem.config.js
             pm2 save
+            pm2 list
+            
+            echo "✅ Deployment completed successfully!"
           EOF
 
-      - name: Reload Nginx (optional)
+      - name: Health Check
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} \
-            "sudo nginx -t && sudo systemctl reload nginx"
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
+            # Use system PATH
+            export PATH="/usr/bin:/usr/local/bin:/bin:/sbin:/usr/sbin"
+            
+            # Wait for startup
+            sleep 15
+            
+            # Check PM2 status
+            echo "PM2 Status:"
+            pm2 list
+            pm2 show strapi-app
+            
+            # Check if port 1337 is listening
+            if ss -tlnp | grep -q ":1337"; then
+              echo "✅ Application is listening on port 1337"
+              
+              # Test HTTP response
+              if curl -f http://localhost:1337/admin &>/dev/null; then
+                echo "✅ Application is responding to HTTP requests"
+              else
+                echo "⚠️ Application is running but admin interface may still be loading"
+              fi
+            else
+              echo "❌ Application not listening on port 1337"
+              echo "PM2 logs:"
+              pm2 logs strapi-app --lines 30
+              exit 1
+            fi
+          EOF
+
+      - name: Reload Nginx
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} <<'EOF'
+            if command -v nginx &> /dev/null; then
+              if sudo nginx -t; then
+                sudo systemctl reload nginx
+                echo "✅ Nginx reloaded successfully"
+              else
+                echo "❌ Nginx configuration test failed"
+              fi
+            else
+              echo "ℹ️ Nginx not installed, skipping reload"
+            fi
+          EOF
