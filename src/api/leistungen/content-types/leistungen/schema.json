@@ -80,6 +80,12 @@
         "videos",
         "audios"
       ]
+    },
+    "detailed_content1": {
+      "type": "text"
+    },
+    "detailed_content2": {
+      "type": "text"
     }
   }
 }
