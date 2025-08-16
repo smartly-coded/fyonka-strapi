@@ -11,6 +11,7 @@ export interface SectionsServiceSection extends Struct.ComponentSchema {
     button_text: Schema.Attribute.String;
     content: Schema.Attribute.Text;
     image: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
+    is_icon: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
   };
 }
 

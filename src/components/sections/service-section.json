@@ -24,6 +24,10 @@
     },
     "button_link": {
       "type": "string"
+    },
+    "is_icon": {
+      "type": "boolean",
+      "default": false
     }
   },
   "config": {}
