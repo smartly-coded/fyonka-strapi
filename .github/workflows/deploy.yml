@@ -41,8 +41,10 @@ jobs:
             --exclude=".git" \
             --exclude=".github" \
             --exclude="*.log" \
+            --no-perms --no-owner --no-group --ignore-errors \
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
-            ./ ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }}:/home/deployer/smart-coded-strapi-fyonka/
+            ./ ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }}:/home/deployer/smart-coded-strapi-fyonka/ \
+          || true
 
       - name: Deploy Application
         run: |
