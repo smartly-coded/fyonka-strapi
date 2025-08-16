@@ -28,39 +28,6 @@
       "type": "uid",
       "targetField": ""
     },
-    "detailed_content": {
-      "type": "text"
-    },
-    "detailed_image1": {
-      "type": "media",
-      "multiple": false,
-      "allowedTypes": [
-        "images",
-        "files",
-        "videos",
-        "audios"
-      ]
-    },
-    "detailed_image2": {
-      "type": "media",
-      "multiple": false,
-      "allowedTypes": [
-        "images",
-        "files",
-        "videos",
-        "audios"
-      ]
-    },
-    "detailed_icon": {
-      "type": "media",
-      "multiple": false,
-      "allowedTypes": [
-        "images",
-        "files",
-        "videos",
-        "audios"
-      ]
-    },
     "topimage": {
       "type": "media",
       "multiple": false,
@@ -80,12 +47,6 @@
         "videos",
         "audios"
       ]
-    },
-    "detailed_content1": {
-      "type": "text"
-    },
-    "detailed_content2": {
-      "type": "text"
     },
     "sections": {
       "type": "component",

@@ -705,18 +705,6 @@ export interface ApiLeistungenLeistungen extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    detailed_content: Schema.Attribute.Text;
-    detailed_content1: Schema.Attribute.Text;
-    detailed_content2: Schema.Attribute.Text;
-    detailed_icon: Schema.Attribute.Media<
-      'images' | 'files' | 'videos' | 'audios'
-    >;
-    detailed_image1: Schema.Attribute.Media<
-      'images' | 'files' | 'videos' | 'audios'
-    >;
-    detailed_image2: Schema.Attribute.Media<
-      'images' | 'files' | 'videos' | 'audios'
-    >;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
