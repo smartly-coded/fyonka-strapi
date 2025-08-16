@@ -1,5 +1,15 @@
 import type { Schema, Struct } from '@strapi/strapi';
 
+export interface GalleryGallery extends Struct.ComponentSchema {
+  collectionName: 'components_gallery_galleries';
+  info: {
+    displayName: 'Gallery';
+  };
+  attributes: {
+    image: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
+  };
+}
+
 export interface SectionsServiceSection extends Struct.ComponentSchema {
   collectionName: 'components_sections_service_sections';
   info: {
@@ -80,6 +90,7 @@ export interface SharedSlider extends Struct.ComponentSchema {
 declare module '@strapi/strapi' {
   export module Public {
     export interface ComponentSchemas {
+      'gallery.gallery': GalleryGallery;
       'sections.service-section': SectionsServiceSection;
       'shared.media': SharedMedia;
       'shared.quote': SharedQuote;

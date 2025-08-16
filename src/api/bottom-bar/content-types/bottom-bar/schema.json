@@ -95,6 +95,32 @@
         "videos",
         "audios"
       ]
+    },
+    "tiktokIcon": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "instagramIcon": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "tiktokLink": {
+      "type": "string"
+    },
+    "instagramLink": {
+      "type": "string"
     }
   }
 }

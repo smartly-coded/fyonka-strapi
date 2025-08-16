@@ -501,6 +501,10 @@ export interface ApiBottomBarBottomBar extends Struct.SingleTypeSchema {
       'images' | 'files' | 'videos' | 'audios'
     >;
     googlePlaylink: Schema.Attribute.String;
+    instagramIcon: Schema.Attribute.Media<
+      'images' | 'files' | 'videos' | 'audios'
+    >;
+    instagramLink: Schema.Attribute.String;
     kontaktIcon: Schema.Attribute.Media<
       'images' | 'files' | 'videos' | 'audios'
     >;
@@ -517,6 +521,10 @@ export interface ApiBottomBarBottomBar extends Struct.SingleTypeSchema {
     map: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
     phonenumber: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
+    tiktokIcon: Schema.Attribute.Media<
+      'images' | 'files' | 'videos' | 'audios'
+    >;
+    tiktokLink: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -582,6 +590,34 @@ export interface ApiContactFormContactForm extends Struct.CollectionTypeSchema {
     privacyAccepted: Schema.Attribute.Boolean & Schema.Attribute.Required;
     publishedAt: Schema.Attribute.DateTime;
     submittedAt: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiGalleryGallery extends Struct.CollectionTypeSchema {
+  collectionName: 'galleries';
+  info: {
+    displayName: 'Gallery';
+    pluralName: 'galleries';
+    singularName: 'gallery';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    Image: Schema.Attribute.Component<'gallery.gallery', true>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::gallery.gallery'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -1240,6 +1276,7 @@ declare module '@strapi/strapi' {
       'api::bottom-bar.bottom-bar': ApiBottomBarBottomBar;
       'api::category.category': ApiCategoryCategory;
       'api::contact-form.contact-form': ApiContactFormContactForm;
+      'api::gallery.gallery': ApiGalleryGallery;
       'api::global.global': ApiGlobalGlobal;
       'api::hero-section.hero-section': ApiHeroSectionHeroSection;
       'api::home-leistungen.home-leistungen': ApiHomeLeistungenHomeLeistungen;
