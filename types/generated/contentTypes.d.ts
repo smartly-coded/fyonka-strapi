@@ -727,6 +727,7 @@ export interface ApiLeistungenLeistungen extends Struct.CollectionTypeSchema {
       'images' | 'files' | 'videos' | 'audios'
     >;
     publishedAt: Schema.Attribute.DateTime;
+    sections: Schema.Attribute.Component<'sections.service-section', true>;
     slug: Schema.Attribute.UID<''>;
     title: Schema.Attribute.String;
     topimage: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;

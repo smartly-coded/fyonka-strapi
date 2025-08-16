@@ -86,6 +86,11 @@
     },
     "detailed_content2": {
       "type": "text"
+    },
+    "sections": {
+      "type": "component",
+      "component": "sections.service-section",
+      "repeatable": true
     }
   }
 }
