@@ -97,7 +97,7 @@ export default {
                 from: '"Fyonka Website" <kontakt@fyonka.de>',
                 to: 'kontakt@fyonka.de',
                 replyTo: formData.email,
-                subject: `🔔 رسالة جديدة من موقع Fyonka - ${formData.name}`,
+                subject: ``,
                 html: `
                   <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 10px; overflow: hidden;">
                     <div style="background: linear-gradient(135deg, #b18738ff, #A0821F); padding: 30px; text-align: center; color: white;">
