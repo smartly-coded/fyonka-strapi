@@ -1,5 +1,6 @@
 {
   "kind": "collectionType",
+
   "collectionName": "contact_forms",
   "info": {
     "singularName": "contact-form",
@@ -7,20 +8,22 @@
     "displayName": "contact-form"
   },
   "options": {
-    "draftAndPublish": true
+    "draftAndPublish": false
   },
   "pluginOptions": {},
   "attributes": {
     "name": {
       "type": "string",
-      "required": true
+      "required": true,
+      "maxLength": 255
     },
     "email": {
       "type": "email",
       "required": true
     },
     "phone": {
-      "type": "string"
+      "type": "string",
+      "maxLength": 50
     },
     "message": {
       "type": "text",
@@ -28,11 +31,27 @@
     },
     "privacyAccepted": {
       "type": "boolean",
+      "default": false,
       "required": true
     },
     "submittedAt": {
-      "type": "datetime",
-      "required": true
+      "type": "datetime"
+    },
+    "emailSent": {
+      "type": "boolean",
+      "default": false
+    },
+    "emailSentAt": {
+      "type": "datetime"
+    },
+    "emailMessageId": {
+      "type": "string"
+    },
+    "emailError": {
+      "type": "text"
+    },
+    "emailAttemptedAt": {
+      "type": "datetime"
     }
   }
 }

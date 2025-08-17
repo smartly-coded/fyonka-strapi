@@ -489,11 +489,16 @@ export interface ApiBottomBarBottomBar extends Struct.SingleTypeSchema {
     appStorePhoto: Schema.Attribute.Media<
       'images' | 'files' | 'videos' | 'audios'
     >;
+    cashIcon: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     email: Schema.Attribute.String;
     emailIcon: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
+    facebookIcon: Schema.Attribute.Media<
+      'images' | 'files' | 'videos' | 'audios'
+    >;
+    facebookLink: Schema.Attribute.String;
     fyonkaLogo: Schema.Attribute.Media<
       'images' | 'files' | 'videos' | 'audios'
     >;
@@ -519,6 +524,9 @@ export interface ApiBottomBarBottomBar extends Struct.SingleTypeSchema {
       'images' | 'files' | 'videos' | 'audios'
     >;
     map: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
+    paypalIcon: Schema.Attribute.Media<
+      'images' | 'files' | 'videos' | 'audios'
+    >;
     phonenumber: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
     tiktokIcon: Schema.Attribute.Media<
@@ -528,6 +536,11 @@ export interface ApiBottomBarBottomBar extends Struct.SingleTypeSchema {
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    visaIcon: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
+    whatsappIcon: Schema.Attribute.Media<
+      'images' | 'files' | 'videos' | 'audios'
+    >;
+    whatsappLink: Schema.Attribute.String;
   };
 }
 
@@ -571,13 +584,18 @@ export interface ApiContactFormContactForm extends Struct.CollectionTypeSchema {
     singularName: 'contact-form';
   };
   options: {
-    draftAndPublish: true;
+    draftAndPublish: false;
   };
   attributes: {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     email: Schema.Attribute.Email & Schema.Attribute.Required;
+    emailAttemptedAt: Schema.Attribute.DateTime;
+    emailError: Schema.Attribute.Text;
+    emailMessageId: Schema.Attribute.String;
+    emailSent: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    emailSentAt: Schema.Attribute.DateTime;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -585,11 +603,20 @@ export interface ApiContactFormContactForm extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     message: Schema.Attribute.Text & Schema.Attribute.Required;
-    name: Schema.Attribute.String & Schema.Attribute.Required;
-    phone: Schema.Attribute.String;
-    privacyAccepted: Schema.Attribute.Boolean & Schema.Attribute.Required;
+    name: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 255;
+      }>;
+    phone: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 50;
+      }>;
+    privacyAccepted: Schema.Attribute.Boolean &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<false>;
     publishedAt: Schema.Attribute.DateTime;
-    submittedAt: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    submittedAt: Schema.Attribute.DateTime;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
